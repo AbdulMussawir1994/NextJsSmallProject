@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import type { GenericResponse } from "@/model/model";
 
-/** Pass a stable loader (an API method or a useCallback function). */
 export default function useApiData<T>(load: (signal: AbortSignal) => Promise<GenericResponse<T>>) {
   const empty = { data: null, loading: true, error: "" };
   const [state, setState] = useState<{ data: T | null; loading: boolean; error: string }>(empty);
@@ -27,7 +26,6 @@ export default function useApiData<T>(load: (signal: AbortSignal) => Promise<Gen
     return () => controller.abort();
   }, [load, revision]);
 
-  // Activity hides pages without unmounting; the next visit starts a fresh read.
   useLayoutEffect(() => () => {
     setState((current) => ({ ...current, loading: true, error: "" }));
   }, []);

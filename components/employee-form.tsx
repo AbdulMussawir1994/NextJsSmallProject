@@ -20,7 +20,6 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Activity preserves drafts, but a completed form must unlock on its next visit.
   useLayoutEffect(() => {
     visible.current = true;
     return () => {
