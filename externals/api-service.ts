@@ -11,60 +11,76 @@ export class ApiError extends Error {
   }
 }
 
-function assertValid(
-  condition: unknown,
-  message = "The API returned an invalid employee response.",
-  status = 502,
-): asserts condition {
-  if (!condition) throw new ApiError(message, status);
-}
+type RequestOptions<T> = {
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  parseData: (data: unknown) => T;
+  body?: Employee;
+  signal?: AbortSignal;
+};
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+export const employeeAPI = {
+  async list(signal?: AbortSignal): Promise<GenericResponse<Employee[]>> {
+    return request("/List", {
+      method: "GET",
+      parseData: parseEmployees,
+      signal,
+    });
+  },
 
-function isEmployeeId(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 2_147_483_647;
-}
+  async get(id: string | number, signal?: AbortSignal): Promise<GenericResponse<Employee>> {
+    return request(`/GetById/${parseId(id)}`, {
+      method: "GET",
+      parseData: parseEmployee,
+      signal,
+    });
+  },
 
-function parseId(id: string | number): number {
-  const value = Number(id);
-  assertValid(
-    (typeof id !== "string" || /^\d+$/.test(id)) && isEmployeeId(value),
-    "Invalid employee ID.",
-    400,
-  );
-  return value;
-}
+  async create(data: EmployeeInput, signal?: AbortSignal): Promise<GenericResponse<number>> {
+    return request("/Add", {
+      method: "POST",
+      body: { ...data, id: 0 },
+      signal,
+      parseData(value) {
+        if (!isEmployeeId(value)) {
+          throw new ApiError("The API returned an invalid employee ID.", 502);
+        }
+        return value;
+      },
+    });
+  },
 
-function parseEmployee(value: unknown): Employee {
-  assertValid(isRecord(value));
-  const { id, name, department, salary } = value;
-  assertValid(
-    isEmployeeId(id) && typeof name === "string" && typeof department === "string" &&
-    typeof salary === "number" && Number.isFinite(salary),
-  );
-  return { id, name, department, salary };
-}
+  async update(
+    id: string | number,
+    data: EmployeeInput,
+    signal?: AbortSignal,
+  ): Promise<GenericResponse<Employee>> {
+    return request("/Update", {
+      method: "PUT",
+      body: { ...data, id: parseId(id) },
+      parseData: parseEmployee,
+      signal,
+    });
+  },
 
-function parseEmployees(value: unknown): Employee[] {
-  assertValid(Array.isArray(value));
-  const ids = new Set<number>();
-  return value.map((item) => {
-    const employee = parseEmployee(item);
-    assertValid(!ids.has(employee.id));
-    ids.add(employee.id);
-    return employee;
-  });
-}
+  async delete(id: string | number, signal?: AbortSignal): Promise<GenericResponse<boolean>> {
+    return request(`/Delete/${parseId(id)}`, {
+      method: "DELETE",
+      signal,
+      parseData(value) {
+        if (typeof value !== "boolean") {
+          throw new ApiError("The API returned an invalid deletion result.", 502);
+        }
+        if (!value) {
+          throw new ApiError("The API did not delete the employee.", 409);
+        }
+        return value;
+      },
+    });
+  },
+};
 
-async function request<T>(
-  path: string,
-  method: "GET" | "POST" | "PUT" | "DELETE",
-  parseData: (data: unknown) => T,
-  body?: Employee,
-  signal?: AbortSignal,
-): Promise<GenericResponse<T>> {
+async function request<T>(path: string, options: RequestOptions<T>): Promise<GenericResponse<T>> {
+  const { method, body, signal, parseData } = options;
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     signal,
@@ -85,21 +101,27 @@ async function request<T>(
   signal?.throwIfAborted();
   const message = isRecord(payload) && typeof payload.message === "string" ? payload.message.trim() : "";
 
-  assertValid(
-    response.ok,
-    message || `The API request failed (${response.status}). Please try again.`,
-    response.status,
-  );
-  assertValid(
-    isRecord(payload) && typeof payload.isSuccess === "boolean" &&
-    typeof payload.message === "string" && typeof payload.status === "number" &&
-    Number.isInteger(payload.status),
-  );
-  assertValid(
-    payload.isSuccess && payload.status >= 200 && payload.status < 300,
-    message || "The employee operation failed.",
-    payload.status,
-  );
+  if (!response.ok) {
+    throw new ApiError(
+      message || `The API request failed (${response.status}). Please try again.`,
+      response.status,
+    );
+  }
+
+  if (
+    !isRecord(payload) ||
+    typeof payload.isSuccess !== "boolean" ||
+    typeof payload.message !== "string" ||
+    typeof payload.status !== "number" ||
+    !Number.isInteger(payload.status)
+  ) {
+    throw new ApiError("The API returned an invalid response wrapper.", 502);
+  }
+
+  if (!payload.isSuccess || payload.status < 200 || payload.status >= 300) {
+    throw new ApiError(message || "The employee operation failed.", payload.status);
+  }
+
   return {
     data: parseData(payload.data),
     isSuccess: payload.isSuccess,
@@ -108,27 +130,52 @@ async function request<T>(
   };
 }
 
-export const employeeAPI = {
-  list(signal?: AbortSignal) {
-    return request("/List", "GET", parseEmployees, undefined, signal);
-  },
-  async get(id: string | number, signal?: AbortSignal) {
-    return request(`/GetById/${parseId(id)}`, "GET", parseEmployee, undefined, signal);
-  },
-  create(data: EmployeeInput) {
-    return request("/Add", "POST", (value) => {
-      assertValid(isEmployeeId(value));
-      return value;
-    }, { ...data, id: 0 });
-  },
-  async update(id: string | number, data: EmployeeInput) {
-    return request("/Update", "PUT", parseEmployee, { ...data, id: parseId(id) });
-  },
-  async delete(id: string | number) {
-    return request<boolean>(`/Delete/${parseId(id)}`, "DELETE", (value) => {
-      assertValid(typeof value === "boolean");
-      assertValid(value, "The API did not delete the employee.", 409);
-      return value;
-    });
-  },
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isEmployeeId(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 2_147_483_647;
+}
+
+function parseId(id: string | number): number {
+  const value = Number(id);
+  if ((typeof id === "string" && !/^\d+$/.test(id)) || !isEmployeeId(value)) {
+    throw new ApiError("Invalid employee ID.", 400);
+  }
+  return value;
+}
+
+function parseEmployee(value: unknown): Employee {
+  if (!isRecord(value)) {
+    throw new ApiError("The API returned an invalid employee response.", 502);
+  }
+
+  const { id, name, department, salary } = value;
+  if (
+    !isEmployeeId(id) ||
+    typeof name !== "string" ||
+    typeof department !== "string" ||
+    typeof salary !== "number" ||
+    !Number.isFinite(salary)
+  ) {
+    throw new ApiError("The API returned an invalid employee response.", 502);
+  }
+  return { id, name, department, salary };
+}
+
+function parseEmployees(value: unknown): Employee[] {
+  if (!Array.isArray(value)) {
+    throw new ApiError("The API returned an invalid employee list.", 502);
+  }
+
+  const ids = new Set<number>();
+  return value.map((item) => {
+    const employee = parseEmployee(item);
+    if (ids.has(employee.id)) {
+      throw new ApiError("The API returned duplicate employee IDs.", 502);
+    }
+    ids.add(employee.id);
+    return employee;
+  });
+}

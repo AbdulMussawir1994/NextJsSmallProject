@@ -1,6 +1,6 @@
 ﻿# Employee Manager
 
-A small employee CRUD application using the installed Next.js 16.4.5, React 19.3, and TypeScript. Create, list, view, edit, and delete records through your ASP.NET Core API at `https://localhost:7047`.
+A small employee CRUD application using the installed Next.js 16.4.6, React 19.3, and TypeScript. Create, list, view, edit, and delete records through your ASP.NET Core API at `https://localhost:7047`.
 
 ## Run locally
 
@@ -20,6 +20,16 @@ Copy-Item .env.example .env.local
 ```
 
 Edit `NEXT_PUBLIC_API_BASE_URL` in `.env.local`, then restart the dev server. Public environment variables are included at build time, so rebuild for production after changing this URL.
+
+## UI packages
+
+Bootstrap CSS is loaded globally through `app/bootstrap.css` in the root layout. Use Bootstrap classes such as `btn btn-primary`, `row`, and `col-md-6` in JSX.
+
+React Bootstrap supplies interactive components such as modals and dropdowns. Import individual components inside a Client Component with `"use client"`, for example `import Modal from "react-bootstrap/Modal"`. React Bootstrap manages their behavior through React props and state. See the [React Bootstrap documentation](https://react-bootstrap.github.io/docs/getting-started/introduction/).
+
+Tailwind CSS 4 uses the existing Turbopack loader. Its utilities use the `tw:` prefix, for example `className="tw:flex tw:gap-4"`. The CSS layer order is Tailwind theme, Bootstrap, application styles, then Tailwind utilities. Tailwind imports its theme and utilities to preserve the application's existing base styles. See the [Tailwind configuration guidance](https://tailwindcss.com/docs/preflight#disabling-preflight).
+
+jQuery is initialized in the browser after hydration by `components/jquery-setup.tsx` and becomes available as `window.$` and `window.jQuery`. For component code that depends on jQuery being ready, load it directly inside an effect or event handler with `const { default: $ } = await import("jquery")`. Scope jQuery plugins to a ref-owned element and clean up their handlers and instances when the component unmounts.
 
 ## Model and API contract
 

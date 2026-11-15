@@ -129,6 +129,24 @@ test("delete calls /Delete/{id} and requires a true result", async (t) => {
   assertRequest(fetchMock, "/Delete/2", "DELETE");
 });
 
+test("create, update, and delete pass optional cancellation signals to fetch", async (t) => {
+  const { employeeAPI } = await loadService();
+  const controller = new AbortController();
+  const responses = [success(4), success(employee), success(true)];
+  const fetchMock = t.mock.method(globalThis, "fetch", async () =>
+    Response.json(responses.shift()),
+  );
+
+  await employeeAPI.create(input, controller.signal);
+  await employeeAPI.update(2, input, controller.signal);
+  await employeeAPI.delete(2, controller.signal);
+
+  assert.equal(fetchMock.mock.callCount(), 3);
+  for (const call of fetchMock.mock.calls) {
+    assert.equal(call.arguments[1].signal, controller.signal);
+  }
+});
+
 test("an empty list and a zero salary remain valid employee data", async (t) => {
   const { employeeAPI } = await loadService();
   const responses = [success([]), success({ ...employee, salary: 0 })];

@@ -1,3 +1,8 @@
+@layer theme, bootstrap, app, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(tw);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(tw);
+
+@layer app {
 :root {
   --background: #f7f8fb;
   --surface: #fff;
@@ -17,8 +22,9 @@ button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .6; }
 :focus-visible { outline: 3px solid #91a0f6; outline-offset: 3px; }
 h1, h2, p { margin: 0; }
+h1, h2 { font-weight: 700; }
 h1 { display: flex; align-items: center; gap: 12px; margin: 5px 0 8px; font-size: 30px; line-height: 1.25; letter-spacing: -.7px; }
-h2 { font-size: 18px; letter-spacing: -.3px; }
+h2 { font-size: 18px; line-height: inherit; letter-spacing: -.3px; }
 .muted { color: var(--muted); }
 .skip-link { position: absolute; left: 20px; top: -100px; z-index: 10; padding: 10px; background: white; }
 .skip-link:focus { top: 10px; }
@@ -41,7 +47,7 @@ h2 { font-size: 18px; letter-spacing: -.3px; }
 .button-danger { background: #c43535; color: white; }
 .button-danger:hover { background: #aa2727; }
 .button[aria-disabled] { opacity: .6; }
-.card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.card { border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: var(--surface); overflow: hidden; }
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
 thead { background: #fafbfe; color: var(--muted); }
@@ -109,4 +115,5 @@ dd { margin: 0; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
   .detail-grid { padding: 22px; }
   .notice { align-items: flex-start; }
   thead th, tbody th, tbody td { padding-left: 16px; padding-right: 16px; }
+}
 }

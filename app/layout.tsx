@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import "./bootstrap.css";
 import "./globals.css";
 import Link from "next/link";
+import JQuerySetup from "@/components/jquery-setup";
 
 export const metadata: Metadata = {
   title: "Employee Manager",
@@ -15,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <JQuerySetup />
         <a className="skip-link" href="#main">
           Skip to content
         </a>
