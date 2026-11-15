@@ -1,32 +1,46 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 
-// Exercise the actual service without a TS runner or a live backend. Its only
-// import is type-only, so transpilation produces a self-contained ES module.
-const source = await readFile(
-  new URL("../externals/api-service.ts", import.meta.url),
-  "utf8",
-);
-const { outputText } = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.ESNext,
-    target: ts.ScriptTarget.ES2022,
-  },
-});
-let moduleRevision = 0;
+// Transpile the real module graph in memory, with fresh exports for each test.
+// A shared module cache keeps ApiError identity consistent within each graph.
+const compiledModules = new Map();
 
-async function loadService(baseUrl) {
+function loadModule(url, modules) {
+  if (modules.has(url.href)) return modules.get(url.href).exports;
+
+  if (!compiledModules.has(url.href)) {
+    const source = readFileSync(url, "utf8");
+    const { outputText } = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    });
+    compiledModules.set(url.href, outputText);
+  }
+
+  const loadedModule = { exports: {} };
+  modules.set(url.href, loadedModule);
+  const requireLocal = (specifier) => {
+    if (!specifier.startsWith(".")) {
+      throw new Error(`Unexpected runtime dependency in API tests: ${specifier}`);
+    }
+    return loadModule(new URL(`${specifier}.ts`, url), modules);
+  };
+  const execute = new Function("require", "module", "exports", compiledModules.get(url.href));
+  execute(requireLocal, loadedModule, loadedModule.exports);
+  return loadedModule.exports;
+}
+
+async function loadService(baseUrl, moduleName = "api-service") {
   const previous = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (baseUrl === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL;
   else process.env.NEXT_PUBLIC_API_BASE_URL = baseUrl;
 
   try {
-    const isolatedSource = `${outputText}\n// import ${moduleRevision++}`;
-    return await import(
-      `data:text/javascript;base64,${Buffer.from(isolatedSource).toString("base64")}`
-    );
+    return loadModule(new URL(`../externals/${moduleName}.ts`, import.meta.url), new Map());
   } finally {
     if (previous === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL;
     else process.env.NEXT_PUBLIC_API_BASE_URL = previous;
@@ -88,6 +102,41 @@ test("list reads /List and preserves the response envelope", async (t) => {
   assert.deepEqual(await employeeAPI.list(controller.signal), payload);
   const options = assertRequest(fetchMock, "/List", "GET");
   assert.equal(options.signal, controller.signal);
+});
+
+test("the service exposes five CRUD methods and its list works as a detached callback", async (t) => {
+  const { employeeAPI, EmployeeApiService } = await loadService();
+  const methods = Object.getOwnPropertyNames(EmployeeApiService.prototype)
+    .filter((name) => name !== "constructor")
+    .sort();
+  assert.deepEqual(methods, ["create", "delete", "get", "list", "update"]);
+  assert.ok(employeeAPI instanceof EmployeeApiService);
+
+  const payload = success([employee]);
+  const fetchMock = mockResponse(t, payload);
+  const { list } = employeeAPI;
+  const controller = new AbortController();
+
+  assert.deepEqual(await list(controller.signal), payload);
+  assert.equal(fetchMock.mock.calls[0].arguments[1].signal, controller.signal);
+});
+
+test("the shared request serializes false, zero, and null JSON bodies", async (t) => {
+  const { request } = await loadService(undefined, "http-client");
+  const payload = success(true);
+  const fetchMock = mockResponse(t, payload);
+
+  for (const body of [false, 0, null]) {
+    assert.deepEqual(await request("/example", {
+      method: "PATCH",
+      body,
+      parseData: (data) => data,
+    }), payload);
+    const options = fetchMock.mock.calls.at(-1).arguments[1];
+    assert.equal(options.method, "PATCH");
+    assert.equal(options.headers["Content-Type"], "application/json");
+    assert.equal(options.body, JSON.stringify(body));
+  }
 });
 
 test("get reads /GetById/{id} and accepts an integer route parameter", async (t) => {

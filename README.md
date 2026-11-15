@@ -59,7 +59,7 @@ These routes match the backend's OpenAPI definition. All responses use the wrapp
 | PUT | `/Update` | Employee with its existing ID | Updated `Employee` |
 | DELETE | `/Delete/{id}` | — | `boolean` |
 
-The shared form edits name, department, and salary. Names and departments are required; salary accepts zero or more with two decimal places. IDs come from the backend. Successful saves open the employee's details and show the backend message. Deletion has its own confirmation page and returns to the list after success.
+The shared form edits name, department, and salary. Names and departments are required; salary accepts zero or more with two decimal places. IDs come from the backend. Successful saves open the employee list and show the backend message. Deletion has its own confirmation page and returns to the list after success.
 
 The API service validates response shapes and checks both HTTP status and `isSuccess`/`status` in the response. Backend failure messages are displayed even when HTTP status is 200. A shared hook handles loading, errors, retries, and cancellation when a page is hidden or unmounted. Spinners show during every API operation.
 
@@ -121,6 +121,8 @@ app/
 - `components/employee-route.tsx`: shared Suspense boundary for dynamic route data.
 - `components/employee-ui.tsx`: headings, loading states, errors, and busy buttons.
 - `hooks/use-api-data.ts`: reusable reads with cancellation and retry.
-- `externals/api-service.ts`: typed API calls and response validation.
+- `externals/api-service.ts`: `EmployeeApiService` with the five employee CRUD request methods.
+- `externals/http-client.ts`: shared fetch configuration, JSON response handling, and API errors.
+- `externals/employee-validation.ts`: employee IDs and response data validation.
 - `model/model.ts`: employee and generic response types.
 - `lib/format.ts`: shared salary formatting.

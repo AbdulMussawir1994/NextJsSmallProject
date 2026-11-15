@@ -45,7 +45,13 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
       salary: Number(salary),
     };
     setError("");
-    if (!data.name || !data.department || !salary || !Number.isFinite(data.salary) || data.salary < 0) {
+    if (
+      !data.name ||
+      !data.department ||
+      !salary ||
+      !Number.isFinite(data.salary) ||
+      data.salary < 0
+    ) {
       setError("Enter a name, department, and a salary of zero or more.");
       return;
     }
@@ -56,17 +62,24 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
       const response = employee
         ? await employeeAPI.update(employee.id, data)
         : await employeeAPI.create(data);
-      const id = typeof response.data === "number" ? response.data : response.data.id;
+
+      const id =
+        typeof response.data === "number" ? response.data : response.data.id;
       if (!employee) form.reset();
       phase.current = "saved";
       if (visible.current) {
-        router.replace(`/employees/${id}?message=${encodeURIComponent(response.message)}`);
+        // router.replace(`/employees?message=${encodeURIComponent(response.message)}`);
+        router.replace(
+          `/employees/${id}?message=${encodeURIComponent(response.message)}`,
+        );
       } else {
         phase.current = "idle";
         setSaving(false);
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not save the employee.");
+      setError(
+        error instanceof Error ? error.message : "Could not save the employee.",
+      );
       phase.current = "idle";
       setSaving(false);
     }
@@ -77,14 +90,21 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
       <div className="card-heading">
         <h2>Employee details</h2>
         <p className="muted">
-          {employee ? `Employee ID: ${employee.id}` : "An employee ID will be generated when you save."}
+          {employee
+            ? `Employee ID: ${employee.id}`
+            : "An employee ID will be generated when you save."}
         </p>
       </div>
       <ErrorNotice message={error} />
       <fieldset disabled={saving} className="form-fields">
         {fields.map(({ name, label, placeholder }) => (
-          <div key={name} className={`field${name === "name" ? " full-width" : ""}`}>
-            <label htmlFor={name}>{label} <span className="required">*</span></label>
+          <div
+            key={name}
+            className={`field${name === "name" ? " full-width" : ""}`}
+          >
+            <label htmlFor={name}>
+              {label} <span className="required">*</span>
+            </label>
             <input
               id={name}
               name={name}
@@ -103,9 +123,13 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
         <span className="field-hint">* Required fields</span>
         <div className="actions">
           {saving ? (
-            <span className="button button-secondary" aria-disabled="true">Cancel</span>
+            <span className="button button-secondary" aria-disabled="true">
+              Cancel
+            </span>
           ) : (
-            <Link href="/employees" className="button button-secondary">Cancel</Link>
+            <Link href="/employees" className="button button-secondary">
+              Cancel
+            </Link>
           )}
           <BusyButton busy={saving} type="submit">
             {employee ? "Save changes" : "Add employee"}
